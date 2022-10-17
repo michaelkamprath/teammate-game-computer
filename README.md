@@ -3,7 +3,7 @@ This repository is an ode to one of my favorite childhood toys: the **T.E.A.M.M.
 ## Schematics
 The `schematic` directory contains a KiCad electrical schematic of the **T.E.A.M.M.A.T.E.** This was obtained by simply filling PCB traces and wires to understand what is connected to what.
 
-## Logix **T.E.A.M.M.A.T.E.** Links
+## Links
 
 * Original **T.E.A.M.M.A.T.E.** documentation:
   * [T.E.A.M.M.A.T.E. Game Computer manual](https://archive.org/details/elecgames/Logix%20Teammate%20Game%20Computer/LogixTeammateGameComputer/)
