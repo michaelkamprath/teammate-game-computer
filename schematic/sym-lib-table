@@ -1,0 +1,4 @@
+(sym_lib_table
+  (lib (name "mostek_3870")(type "KiCad")(uri "${KIPRJMOD}/mostek_3870.kicad_sym")(options "")(descr ""))
+  (lib (name "ds8871")(type "KiCad")(uri "${KIPRJMOD}/ds8871.kicad_sym")(options "")(descr ""))
+)
