@@ -1,0 +1,268 @@
+#require "mostek-3870-asm >= 0.0.1"
+
+.memzone kernel_zone
+
+TIMER_TEMP_R = 6
+AREG_SAVE_R = 7
+ISAR_SAVE_R = 8
+
+DISPLAY_SCAN_STATE_SPR = $3C
+HEX_DISPLAY_VALUE_SPR = $3D
+SCREEN_BUFFER_A_SPR = $3E
+SCREEN_BUFFER_B_SPR = $3F
+
+;
+; Screen Buffer layout - as viewed from user's perspective.
+;
+;     [A|B]x ==> buffer byte A or B, bit x
+;
+;
+;               COL0  COL1  COL2  COL3
+;           +--------------------------+
+;           ;                          :
+;    ROW0   :   A4    A3    B4    B3   :
+;           :                          :
+;    ROW1   :   A5    A2    B5    B2   :
+;           :                          :
+;    ROW2   :   A6    A1    B6    B1   :
+;           :                          :
+;    ROW3   :   A7    A0    B7    B0   :
+;           :                          :
+;           +--------------------------+
+;
+
+
+; clear_screeen - subroutine
+;
+;   Sets all LEDs off.
+;
+;   Arguments
+;       None
+clear_screeen_buffer:
+    li SCREEN_BUFFER_A_SPR
+    lr is,a
+    clr
+    lr [is],a
+    li SCREEN_BUFFER_B_SPR
+    lr is,a
+    clr
+    lr [is],a
+    pop
+
+
+; set LED status
+;
+;   Sets the indicated LED on
+;
+;   Argument
+;       sp 1 - Indicates the LED to set and to what value
+;
+;       bits 7 6 5 4 3 2 1 0
+;            x x x|-|---|---|
+;                  |  |   +---> X coordinate (COL0 - COL3)
+;                  |  +-------> Y coordinate (ROW0 - ROW3)
+;                  +----------> on (1) or off (0)
+; set_led_on:
+;     ; move x coordinat to sp 2
+;     lr a,1
+;     ni b00000011
+;     lr 2,a
+;     ; move y coordinate to sp 3
+;     lr a,1
+;     ni b00001100
+;     sr 1
+;     sr 1
+;     lr 3,a
+;     ; determine buffer A or B by inspecting bit 1
+;     lr a,2
+;     ni b00000010
+;     ci b00000010
+;     bz .buffer_b
+; .buffer_a:
+;     li SCREEN_BUFFER_A_SPR
+;     br .load_buffer_spr
+; .buffer_b:
+;     li SCREEN_BUFFER_B_SPR
+; .load_buffer_spr:
+;     lr is,a
+;     ; determine buffer bit
+;     lr a,2
+;     ni b00000001
+;     ci b00000001
+;     bz .right_col
+; .
+
+start_display_scanning:
+    ; initialize scan state
+    li DISPLAY_SCAN_STATE_SPR
+    lr is,a
+    clr
+    lr [is],a
+    ; clear screen
+    li SCREEN_BUFFER_A_SPR
+    lr is,a
+    clr
+    lr [is],a
+    li SCREEN_BUFFER_B_SPR
+    lr is,a
+    clr
+    lr [is],a
+    li HEX_DISPLAY_VALUE_SPR
+    lr is,a
+    clr
+    lr [is],a
+    ; install interupt handler
+    ;   by default, timer handler is at $020, which is
+    ;   what memzone timer_handler is defined to be.
+    ;
+    ; set the timer counter value port (7)
+    li 100
+    outs 7
+    ; Set the interupt control port (6)
+    ;       bit 1 - timer intrupt enable
+    ;       bit 3 - start timer
+    ;       bit 5 - /2 prescale
+    ;       bit 6 - /5 prescale
+    ;       bit 7 - /20 prescale
+    li b00101010
+    outs 6
+    ; enable interupts
+    ei
+    pop
+
+; HEX Character Table
+;   bit 0 - segment X
+;   bit 1 - segment G
+;   bit 2 - segment F
+;   bit 3 - segment E
+;   bit 4 - segment D
+;   bit 5 - segment C
+;   bit 6 - segment B
+;   bit 7 - segment A
+_hex_char_table:
+    .byte b11111100   ; value 0
+    .byte b01100000   ; value 1
+    .byte b11011010   ; value 2
+    .byte b11110010   ; value 3
+    .byte b01100110   ; value 4
+    .byte b10110110   ; value 5
+    .byte b10111110   ; value 6
+    .byte b11100000   ; value 7
+    .byte b11111110   ; value 8
+    .byte b11100110   ; value 9
+    .byte b11101110   ; value A
+    .byte b00111110   ; value B
+    .byte b10011100   ; value C
+    .byte b01111010   ; value D
+    .byte b10011110   ; value E
+    .byte b10001110   ; value F
+
+
+.memzone timer_handler
+display_scan:
+    di                          ; disable further interupts
+    lr AREG_SAVE_R,a            ; save A register
+    lr j,w                      ; save status register
+    lr a,is
+    lr ISAR_SAVE_R,a            ; save ISAR
+    ; turn off multiplexer
+    clr
+    outs 0
+    ; prepare jump table
+    dci .scan_state_jump_table
+    ; get scan state
+    li DISPLAY_SCAN_STATE_SPR
+    lr is,a
+    lr a,[is]
+    ; get first two bits
+    ni b00000011
+    ; add twice to jump table address for each 2-byte jump entry
+    adc
+    adc
+    ; execute jump table
+    lr q,dc
+    lr p0,q
+.scan_state_jump_table:
+    br .leds_buffer_a
+    br .leds_buffer_b
+    br .left_hex
+    br .right_hex
+
+.leds_buffer_a:
+    lis 1
+    lr TIMER_TEMP_R,a
+    li SCREEN_BUFFER_A_SPR
+    lr is,a
+    br .write_display_buffer
+.leds_buffer_b:
+    lis 2
+    lr TIMER_TEMP_R,a
+    li SCREEN_BUFFER_B_SPR
+    lr is,a
+.write_display_buffer:
+    lr a,[is]
+    com
+    outs 1
+
+    br .update_handler_state
+
+.right_hex:
+    li $40
+    lr TIMER_TEMP_R,a
+    li HEX_DISPLAY_VALUE_SPR
+    lr is,a
+    lr a,[is]
+    ni $0F
+    br .show_hex_value
+.left_hex:
+    li $80
+    lr TIMER_TEMP_R,a
+    li HEX_DISPLAY_VALUE_SPR
+    lr is,a
+    lr a,[is]
+    ni $F0
+    sr 4
+.show_hex_value:
+    ; fetch hex character from LUT
+    dci _hex_char_table
+    adc
+    lm
+    com             ; invert the bits
+    outs 1
+.update_handler_state:
+    lr a,TIMER_TEMP_R
+    outs 0
+    li DISPLAY_SCAN_STATE_SPR
+    lr is,a
+    lr a,[is]
+    ; get first two bits
+    ni b00000011
+    inc
+    ci 4
+    bnz .update_handler_state2
+    ; reset state to zero
+    lr a,[is]
+    ni b11111100
+    lr [is],a
+    br .end_handler
+.update_handler_state2:
+    ; increment state (don't need to mask because we know state counter won't be 4)
+    lr a,[is]
+    inc
+    lr [is],a
+.end_handler:
+    ; set the timer counter value port (7)
+    li 150
+    outs 7
+    ; Set the interupt control port (6)
+    ;       bit 1 - timer intrupt enable
+    ;       bit 3 - start timer
+    ;       bit 6 - /5 prescale
+    li b01001010
+    outs 6
+    lr a,ISAR_SAVE_R
+    lr is,a                     ; restore ISAR
+    lr w,j                      ; restore status register
+    lr a,AREG_SAVE_R            ; restore A register
+    ei                          ; re-enable interupts
+    pop
