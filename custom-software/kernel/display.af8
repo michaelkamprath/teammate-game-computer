@@ -2,7 +2,6 @@
 
 .memzone kernel_zone
 
-TIMER_TEMP_R = 9
 _COL_R = 5
 _ROW_R = 6
 
@@ -53,7 +52,7 @@ clear_display_buffer:
 
 ; set LED status
 ;
-;   Sets the indicated LED on
+;   Sets the indicated LED on or off
 ;
 ;   Argument
 ;       sp 1 - Indicates the LED to set and to what value
@@ -63,6 +62,7 @@ clear_display_buffer:
 ;                  |  |   +---> X coordinate (COL0 - COL3)
 ;                  |  +-------> Y coordinate (ROW0 - ROW3)
 ;                  +----------> on (1) or off (0)
+;
 set_display_led:
     lr k,p                          ; save return address to K
     ; move x coordinate to sp _COL_R
@@ -138,7 +138,13 @@ set_display_led:
 .finalize_led_status:
     pk                              ; done!
 
-start_display_scanning:
+; initialize_display
+;
+;   Initializes the displays
+;
+;   Arguments
+;       None
+initialize_display:
     lr k,p                          ; save return address to K
     ; initialize scan state
     li DISPLAY_SCAN_STATE_SPR
@@ -158,19 +164,6 @@ start_display_scanning:
     lr is,a
     clr
     lr [is],a
-    ; set the timer counter value port (7)
-    li 100
-    outs 7
-    ; Set the interupt control port (6)
-    ;       bit 1 - timer intrupt enable
-    ;       bit 3 - start timer
-    ;       bit 5 - /2 prescale
-    ;       bit 6 - /5 prescale
-    ;       bit 7 - /20 prescale
-    li b00101010
-    outs 6
-    ; enable interupts
-    ei
     pk                             ; return to address K
 
 ; HEX Character Table
@@ -230,13 +223,13 @@ display_scan:
 
 .leds_buffer_a:
     lis 1
-    lr TIMER_TEMP_R,a
+    lr KERNEL_TEMP_R,a
     li SCREEN_BUFFER_A_SPR
     lr is,a
     br .write_display_buffer
 .leds_buffer_b:
     lis 2
-    lr TIMER_TEMP_R,a
+    lr KERNEL_TEMP_R,a
     li SCREEN_BUFFER_B_SPR
     lr is,a
 .write_display_buffer:
@@ -247,7 +240,7 @@ display_scan:
 
 .right_hex:
     li $40
-    lr TIMER_TEMP_R,a
+    lr KERNEL_TEMP_R,a
     li HEX_DISPLAY_VALUE_SPR
     lr is,a
     lr a,[is]
@@ -255,7 +248,7 @@ display_scan:
     br .show_hex_value
 .left_hex:
     li $80
-    lr TIMER_TEMP_R,a
+    lr KERNEL_TEMP_R,a
     li HEX_DISPLAY_VALUE_SPR
     lr is,a
     lr a,[is]
@@ -269,7 +262,7 @@ display_scan:
     com             ; invert the bits
     outs 1
 .update_handler_state:
-    lr a,TIMER_TEMP_R
+    lr a,KERNEL_TEMP_R
     outs 0
     li DISPLAY_SCAN_STATE_SPR
     lr is,a
@@ -290,13 +283,4 @@ display_scan:
     inc
     lr [is],a
 .end_handler:
-    ; set the timer counter value port (7)
-    li 150
-    outs 7
-    ; Set the interupt control port (6)
-    ;       bit 1 - timer intrupt enable
-    ;       bit 3 - start timer
-    ;       bit 6 - /5 prescale
-    li b01001010
-    outs 6
     pop

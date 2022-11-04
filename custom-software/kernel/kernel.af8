@@ -5,6 +5,8 @@
 #create_memzone external_interupt_handler $0A0 $0FF
 #create_memzone kernel_zone $500 $7FF
 
+; Include other aspects of the kernel
+#include "display.af8"
 
 ; Kernel Notes
 ;
@@ -25,13 +27,35 @@
 ;     for the kernel
 ;
 
+_TIMER_COUNTER_VALUE = 100
+; Set the interupt control port (6)
+;       bit 1 - timer intrupt enable
+;       bit 3 - start timer
+;       bit 5 - /2 prescale
+;       bit 6 - /5 prescale
+;       bit 7 - /20 prescale
+_INTERUPT_CONFIG_BITS = b00101010
+
+; SP Registers Used
+_AREG_SAVE_R = 7
+_ISAR_SAVE_R = 8
+KERNEL_TEMP_R = 9
+_KU_SAVE_R = 10
+_KL_SAVE_R = 11
 
 ;
 ; bootstrap code
 .org 0
 _init:
     di
-    pi start_display_scanning
+    pi initialize_display
+    ; set up the timer
+    li _TIMER_COUNTER_VALUE
+    outs 7
+    li _INTERUPT_CONFIG_BITS
+    outs 6
+    ; enable interupts
+    ei
     jmp _start_program
 
 
@@ -41,21 +65,11 @@ _start_program:
 ; nothing should be implemented here. Only defined to
 ; create a known label for the start point of the program
 
-
-.memzone kernel_zone
-
-; Include other aspects of the kernel
-#include "display.af8"
-
-
 .memzone timer_handler
-_AREG_SAVE_R = 7
-_ISAR_SAVE_R = 8
-_KU_SAVE_R = 10
-_KL_SAVE_R = 11
+
 timer_handler:
-    di                          ; disable further interupts
-    lr _AREG_SAVE_R,a            ; save A register
+    di                          ; disable further interupts while in handler
+    lr _AREG_SAVE_R,a           ; save A register
     lr j,w                      ; save status register
     lr a,is
     lr _ISAR_SAVE_R,a            ; save ISAR
@@ -69,17 +83,22 @@ timer_handler:
     ; jump to display handler
     pi display_scan
 
-
 .end_timer_handler:
-    lr a,_ISAR_SAVE_R
-    lr is,a                     ; restore ISAR
-    lr w,j                      ; restore status register
-    lr a,_AREG_SAVE_R            ; restore A register
-    ; restore stak and K
+    ; reset the timer
+    li _TIMER_COUNTER_VALUE
+    outs 7
+    li _INTERUPT_CONFIG_BITS
+    outs 6
+    ; restore stack and K
     lr p,k
     lr a,_KU_SAVE_R
     lr ku,a
     lr a,_KL_SAVE_R
     lr kl,a
+    ; restore registers
+    lr a,_ISAR_SAVE_R
+    lr is,a                     ; restore ISAR
+    lr w,j                      ; restore status register
+    lr a,_AREG_SAVE_R           ; restore A register (must be last update in timer handler)
     ei                          ; re-enable interupts
     pop
