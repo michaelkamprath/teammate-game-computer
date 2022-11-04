@@ -10,24 +10,29 @@
 
 ; Kernel Notes
 ;
+;   The kernel has two main tasks: generate the display multiplexing
+;   and provinding a means to scan the keyboard.
+;
 ;   * In general, only one level of subroutines is supported. The
 ;     timer_handler will do the right thing so as not to interfere
-;     with any running subroutine, but ubroutines should not be
-;     nested. This includes call to kernel subroutines.
-;   * register Q is reserved for handling return addresses in the
-;     timer handler.
-;   * any subroutine should first save stack pointer P to register K
-;     with "lr k,p", and then return from teh subroutine using the
-;     "pk" instruction.
-;   * the kernel and subroutines called by the timer handler
+;     with any running subroutine, but subroutines called from the
+;     application should not be nested. This includes call to kernel
+;     subroutines.
+;   * Register Q is free to be used for interacting with data counter.
+;     Register Q is not used when managing the return stack.
+;   * Any application subroutine should first save stack pointer P to
+;     register K with "lr k,p", and then return from the subroutine
+;     using the "pk" instruction.
+;   * The kernel and subroutines called by the timer handler
 ;     should not use any numbered scratch pad registers less than
 ;     scratch pad 5. Scratch pad registers 1-4 are reserved for
-;     application code.
+;     application code. Similarly, registers 5-11 are reserved for kernel.
+;   * Register 1 is generally used for subroutine argument passing.
 ;   * Addressed scratch pad registers $30 and higher are reserved
 ;     for the kernel
 ;
 
-_TIMER_COUNTER_VALUE = 100
+_TIMER_COUNTER_VALUE = 50
 ; Set the interupt control port (6)
 ;       bit 1 - timer intrupt enable
 ;       bit 3 - start timer
@@ -39,7 +44,7 @@ _INTERUPT_CONFIG_BITS = b00101010
 ; SP Registers Used
 _AREG_SAVE_R = 7
 _ISAR_SAVE_R = 8
-KERNEL_TEMP_R = 9
+TIMER_TEMP_R = 9
 _KU_SAVE_R = 10
 _KL_SAVE_R = 11
 
@@ -66,7 +71,6 @@ _start_program:
 ; create a known label for the start point of the program
 
 .memzone timer_handler
-
 timer_handler:
     di                          ; disable further interupts while in handler
     lr _AREG_SAVE_R,a           ; save A register

@@ -29,15 +29,22 @@ SCREEN_BUFFER_B_SPR = $3F
 ;           :                          :
 ;           +--------------------------+
 ;
+;       This effectively makes sp1 to have the format with the
+;       upper nibble is 1 or 0 for on or off, and the lower
+;       nibble is the LED number, which is calculated with:
+;
+;           LED Number = row*4 + column
+;
+;       Where row and column are values beteen 0 and 3 inclusive.
+;
 
-
-; clear_screeen - subroutine
+; clear_display_leds - subroutine
 ;
 ;   Sets all LEDs off.
 ;
 ;   Arguments
 ;       None
-clear_display_buffer:
+clear_display_leds:
     lr k,p                          ; save return address to K
     li SCREEN_BUFFER_A_SPR
     lr is,a
@@ -49,6 +56,20 @@ clear_display_buffer:
     lr [is],a
     pk                              ; return to address K
 
+; set_hex_value
+;
+;   Sets the values displayed on hex display
+;
+;   Argument
+;       sp 1 - the value to disdplay
+;
+set_hex_value:
+    lr k,p                          ; save return address to K
+    li HEX_DISPLAY_VALUE_SPR
+    lr is,a
+    lr a,1
+    lr [is],a
+    pk
 
 ; set LED status
 ;
@@ -223,13 +244,13 @@ display_scan:
 
 .leds_buffer_a:
     lis 1
-    lr KERNEL_TEMP_R,a
+    lr TIMER_TEMP_R,a
     li SCREEN_BUFFER_A_SPR
     lr is,a
     br .write_display_buffer
 .leds_buffer_b:
     lis 2
-    lr KERNEL_TEMP_R,a
+    lr TIMER_TEMP_R,a
     li SCREEN_BUFFER_B_SPR
     lr is,a
 .write_display_buffer:
@@ -240,7 +261,7 @@ display_scan:
 
 .right_hex:
     li $40
-    lr KERNEL_TEMP_R,a
+    lr TIMER_TEMP_R,a
     li HEX_DISPLAY_VALUE_SPR
     lr is,a
     lr a,[is]
@@ -248,7 +269,7 @@ display_scan:
     br .show_hex_value
 .left_hex:
     li $80
-    lr KERNEL_TEMP_R,a
+    lr TIMER_TEMP_R,a
     li HEX_DISPLAY_VALUE_SPR
     lr is,a
     lr a,[is]
@@ -262,7 +283,7 @@ display_scan:
     com             ; invert the bits
     outs 1
 .update_handler_state:
-    lr a,KERNEL_TEMP_R
+    lr a,TIMER_TEMP_R
     outs 0
     li DISPLAY_SCAN_STATE_SPR
     lr is,a
