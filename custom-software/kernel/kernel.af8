@@ -1,0 +1,83 @@
+#require "mostek-3870-asm >= 0.0.1"
+
+#create_memzone program_zone $100 $4FF
+#create_memzone timer_handler $020 $09F
+#create_memzone external_interupt_handler $0A0 $0FF
+#create_memzone kernel_zone $500 $7FF
+
+
+; Kernel Notes
+;
+;   * In general, only one level of subroutines is supported. The
+;     timer_handler will do the right thing so as not to interfere
+;     with any running subroutine, but ubroutines should not be
+;     nested. This includes call to kernel subroutines.
+;   * register Q is reserved for handling return addresses in the
+;     timer handler.
+;   * any subroutine should first save stack pointer P to register K
+;     with "lr k,p", and then return from teh subroutine using the
+;     "pk" instruction.
+;   * the kernel and subroutines called by the timer handler
+;     should not use any numbered scratch pad registers less than
+;     scratch pad 5. Scratch pad registers 1-4 are reserved for
+;     application code.
+;   * Addressed scratch pad registers $30 and higher are reserved
+;     for the kernel
+;
+
+
+;
+; bootstrap code
+.org 0
+_init:
+    di
+    pi start_display_scanning
+    jmp _start_program
+
+
+
+.org 0 "program_zone"
+_start_program:
+; nothing should be implemented here. Only defined to
+; create a known label for the start point of the program
+
+
+.memzone kernel_zone
+
+; Include other aspects of the kernel
+#include "display.af8"
+
+
+.memzone timer_handler
+_AREG_SAVE_R = 7
+_ISAR_SAVE_R = 8
+timer_handler:
+    di                          ; disable further interupts
+    lr _AREG_SAVE_R,a            ; save A register
+    lr j,w                      ; save status register
+    lr a,is
+    lr _ISAR_SAVE_R,a            ; save ISAR
+    ; set up stack so subroutines can be called from here
+    lr a,ku
+    lr qu,a
+    lr a,kl
+    lr ql,a
+    lr k,p
+
+    ; jump to display handler
+    pi display_scan
+
+
+.end_timer_handler:
+    lr a,_ISAR_SAVE_R
+    lr is,a                     ; restore ISAR
+    lr w,j                      ; restore status register
+    lr a,_AREG_SAVE_R            ; restore A register
+    ; restore stak and K
+    lr p,k
+    lr a,qu
+    lr ku,a
+    lr a,ql
+    lr kl,a
+    ei                          ; re-enable interupts
+    pop
