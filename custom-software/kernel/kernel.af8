@@ -51,6 +51,8 @@ _start_program:
 .memzone timer_handler
 _AREG_SAVE_R = 7
 _ISAR_SAVE_R = 8
+_KU_SAVE_R = 10
+_KL_SAVE_R = 11
 timer_handler:
     di                          ; disable further interupts
     lr _AREG_SAVE_R,a            ; save A register
@@ -59,9 +61,9 @@ timer_handler:
     lr _ISAR_SAVE_R,a            ; save ISAR
     ; set up stack so subroutines can be called from here
     lr a,ku
-    lr qu,a
+    lr _KU_SAVE_R,a
     lr a,kl
-    lr ql,a
+    lr _KL_SAVE_R,a
     lr k,p
 
     ; jump to display handler
@@ -75,9 +77,9 @@ timer_handler:
     lr a,_AREG_SAVE_R            ; restore A register
     ; restore stak and K
     lr p,k
-    lr a,qu
+    lr a,_KU_SAVE_R
     lr ku,a
-    lr a,ql
+    lr a,_KL_SAVE_R
     lr kl,a
     ei                          ; re-enable interupts
     pop
