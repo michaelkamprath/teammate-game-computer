@@ -19,14 +19,14 @@
 ;     application should not be nested. This includes call to kernel
 ;     subroutines.
 ;   * Register Q is free to be used for interacting with data counter.
-;     Register Q is not used when managing the return stack.
+;     Register Q is not used when managing the return stack or the timer.
 ;   * Any application subroutine should first save stack pointer P to
 ;     register K with "lr k,p", and then return from the subroutine
 ;     using the "pk" instruction.
 ;   * The kernel and subroutines called by the timer handler
 ;     should not use any numbered scratch pad registers less than
 ;     scratch pad 5. Scratch pad registers 1-4 are reserved for
-;     application code and some subroutines. Similarly, registers
+;     application code and some kernel subroutines. Similarly, registers
 ;     5-11 (10 and 11 being H) are reserved for kernel.
 ;   * Register 1 is generally used for subroutine argument passing.
 ;   * Addressed scratch pad registers $30 and higher are reserved
@@ -94,7 +94,7 @@ timer_handler:
     lr h,dc
 
     ; jump to display handler
-    pi display_scan
+    pi display_handler
 
 .end_timer_handler:
 

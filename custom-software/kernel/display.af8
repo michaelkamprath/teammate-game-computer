@@ -220,7 +220,7 @@ _hex_char_table:
 ;
 ;   should only be called from timer_handler
 
-display_scan:
+display_handler:
     ; turn off multiplexer
     clr
     outs 0
