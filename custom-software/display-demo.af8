@@ -1,0 +1,44 @@
+; Display Demo
+; 
+;   A simple demo program to demonstrate the usage of the display 
+;   functionality in the T.E.A.M.M.A.T.E. kernel code.
+; 
+
+#require "mostek-3870-asm >= 0.0.1"
+#include "kernel.af8"
+
+
+
+.memzone program_zone
+start:
+
+    lis 0
+    lr 1,a
+    pi set_hex_value
+    li $10
+    lr 1,a
+    pi set_display_led
+
+idle:
+    li 127
+    lr 1,a
+.outer_loop:
+    lr a,1
+    inc
+    lr 1,a
+    bz .next_increment
+    clr
+.loop:
+    inc
+    bnz .loop
+    br .outer_loop
+.next_increment:
+    pi clear_display_leds
+    lris a, HEX_DISPLAY_VALUE_SPR
+    inc
+    lr [is],a
+    ni $0F
+    ai $10
+    lr 1,a
+    pi set_display_led
+    br idle

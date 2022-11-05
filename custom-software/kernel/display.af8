@@ -2,8 +2,8 @@
 
 .memzone kernel_zone
 
-_COL_R = 5
-_ROW_R = 6
+_COL_R = 3
+_ROW_R = 4
 
 DISPLAY_SCAN_STATE_SPR = $3C
 HEX_DISPLAY_VALUE_SPR = $3D
@@ -83,6 +83,8 @@ set_hex_value:
 ;                  |  |   +---> X coordinate (COL0 - COL3)
 ;                  |  +-------> Y coordinate (ROW0 - ROW3)
 ;                  +----------> on (1) or off (0)
+;
+;   Uses registers 3 & 4
 ;
 set_display_led:
     lr k,p                          ; save return address to K
@@ -225,9 +227,7 @@ display_scan:
     ; prepare jump table
     dci .scan_state_jump_table
     ; get scan state
-    li DISPLAY_SCAN_STATE_SPR
-    lr is,a
-    lr a,[is]
+    lris a,DISPLAY_SCAN_STATE_SPR
     ; get first two bits
     ni b00000011
     ; add twice to jump table address for each 2-byte jump entry

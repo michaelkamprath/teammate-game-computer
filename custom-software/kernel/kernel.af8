@@ -26,27 +26,30 @@
 ;   * The kernel and subroutines called by the timer handler
 ;     should not use any numbered scratch pad registers less than
 ;     scratch pad 5. Scratch pad registers 1-4 are reserved for
-;     application code. Similarly, registers 5-11 are reserved for kernel.
+;     application code and some subroutines. Similarly, registers
+;     5-11 (10 and 11 being H) are reserved for kernel.
 ;   * Register 1 is generally used for subroutine argument passing.
 ;   * Addressed scratch pad registers $30 and higher are reserved
 ;     for the kernel
 ;
 
-_TIMER_COUNTER_VALUE = 50
+_TIMER_COUNTER_VALUE = 20
 ; Set the interupt control port (6)
 ;       bit 1 - timer intrupt enable
 ;       bit 3 - start timer
 ;       bit 5 - /2 prescale
 ;       bit 6 - /5 prescale
 ;       bit 7 - /20 prescale
-_INTERUPT_CONFIG_BITS = b00101010
+_INTERUPT_CONFIG_BITS = b10101010
 
 ; SP Registers Used
+TIMER_TEMP_R = 6
 _AREG_SAVE_R = 7
 _ISAR_SAVE_R = 8
-TIMER_TEMP_R = 9
-_KU_SAVE_R = 10
-_KL_SAVE_R = 11
+; J is register 9 - used to save status register
+; H is registers 10 & 11 - used to save data counter
+_KU_SAVE_SPR = $3A
+_KL_SAVE_SPR = $3B
 
 ;
 ; bootstrap code
@@ -78,31 +81,41 @@ timer_handler:
     lr a,is
     lr _ISAR_SAVE_R,a            ; save ISAR
     ; set up stack so subroutines can be called from here
+    li _KU_SAVE_SPR
+    lr is,a
     lr a,ku
-    lr _KU_SAVE_R,a
+    lr [is],a
+    li _KL_SAVE_SPR
+    lr is,a
     lr a,kl
-    lr _KL_SAVE_R,a
+    lr [is],a
     lr k,p
+    ; save data counter
+    lr h,dc
 
     ; jump to display handler
     pi display_scan
 
 .end_timer_handler:
-    ; reset the timer
-    li _TIMER_COUNTER_VALUE
-    outs 7
-    li _INTERUPT_CONFIG_BITS
-    outs 6
+
+    ; restore data counter
+    lr dc,h
     ; restore stack and K
     lr p,k
-    lr a,_KU_SAVE_R
+    lris a,_KU_SAVE_SPR
     lr ku,a
-    lr a,_KL_SAVE_R
+    lris a,_KL_SAVE_SPR
     lr kl,a
     ; restore registers
     lr a,_ISAR_SAVE_R
     lr is,a                     ; restore ISAR
     lr w,j                      ; restore status register
+    ; reset the timer
+    li _TIMER_COUNTER_VALUE
+    outs 7
+    li _INTERUPT_CONFIG_BITS
+    outs 6
+    ; finally, restore a register
     lr a,_AREG_SAVE_R           ; restore A register (must be last update in timer handler)
     ei                          ; re-enable interupts
     pop
