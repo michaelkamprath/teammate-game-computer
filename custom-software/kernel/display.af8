@@ -29,14 +29,6 @@ SCREEN_BUFFER_B_SPR = $3F
 ;           :                          :
 ;           +--------------------------+
 ;
-;       This effectively makes sp1 to have the format with the
-;       upper nibble is 1 or 0 for on or off, and the lower
-;       nibble is the LED number, which is calculated with:
-;
-;           LED Number = row*4 + column
-;
-;       Where row and column are values beteen 0 and 3 inclusive.
-;
 
 ; clear_display_leds - subroutine
 ;
@@ -83,6 +75,14 @@ set_hex_value:
 ;                  |  |   +---> X coordinate (COL0 - COL3)
 ;                  |  +-------> Y coordinate (ROW0 - ROW3)
 ;                  +----------> on (1) or off (0)
+;
+;       This effectively makes sp 1 to have the format where the
+;       upper nibble is 1 or 0 for on or off, and the lower
+;       nibble is the LED number, which is calculated with:
+;
+;           LED Number = row*4 + column
+;
+;       Where row and column are values beteen 0 and 3 inclusive.
 ;
 ;   Uses registers 3 & 4
 ;
