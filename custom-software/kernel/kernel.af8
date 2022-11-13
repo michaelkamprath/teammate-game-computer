@@ -33,7 +33,8 @@
 ;     for the kernel
 ;
 
-_TIMER_COUNTER_VALUE = 20
+; The timer start count value
+_TIMER_COUNTER_VALUE = 10
 ; Set the interupt control port (6)
 ;       bit 1 - timer intrupt enable
 ;       bit 3 - start timer
@@ -42,14 +43,13 @@ _TIMER_COUNTER_VALUE = 20
 ;       bit 7 - /20 prescale
 _INTERUPT_CONFIG_BITS = b10101010
 
-; SP Registers Used
 TIMER_TEMP_R = 6
 _AREG_SAVE_R = 7
 _ISAR_SAVE_R = 8
 ; J is register 9 - used to save status register
 ; H is registers 10 & 11 - used to save data counter
-_KU_SAVE_SPR = $3A
-_KL_SAVE_SPR = $3B
+_KU_SAVE_SPR = $3E
+_KL_SAVE_SPR = $3F
 
 ;
 ; bootstrap code
@@ -93,8 +93,9 @@ timer_handler:
     ; save data counter
     lr h,dc
 
-    ; jump to display handler
+
     pi display_handler
+
 
 .end_timer_handler:
 
@@ -110,7 +111,7 @@ timer_handler:
     lr a,_ISAR_SAVE_R
     lr is,a                     ; restore ISAR
     lr w,j                      ; restore status register
-    ; reset the timer
+    ; set up for next timer
     li _TIMER_COUNTER_VALUE
     outs 7
     li _INTERUPT_CONFIG_BITS

@@ -2,14 +2,14 @@
 
 .memzone kernel_zone
 
-_COL_R = 3
-_ROW_R = 4
+_FUNC_TEMP_R = 4
 
-DISPLAY_SCAN_STATE_SPR = $3C
-HEX_DISPLAY_VALUE_SPR = $3D
-SCREEN_BUFFER_A_SPR = $3E
-SCREEN_BUFFER_B_SPR = $3F
-
+DISPLAY_SCAN_STATE_SPR = $32
+HEX_DISPLAY_VALUE_SPR = $33
+SCREEN_BUFFER_A_SPR = $34
+SCREEN_BUFFER_B_SPR = $35
+_ROW_SPR = $36
+_COL_SPR = $37
 ;
 ; Screen Buffer layout - as viewed from user's perspective.
 ;
@@ -89,17 +89,50 @@ set_hex_value:
 set_display_led:
     lr k,p                          ; save return address to K
     ; move x coordinate to sp _COL_R
+    li _COL_SPR
+    lr is,a
     lr a,1
     ni b00000011
-    lr _COL_R,a
+    lr [is],a
     ; move y coordinate to sp _ROW_R
+    li _ROW_SPR
+    lr is,a
     lr a,1
     ni b00001100
     sr 1
     sr 1
-    lr _ROW_R,a
+    lr [is],a
+
+    ; determine buffer bit
+    ; determine if left or right column of buffer
+    lris a,_COL_SPR
+    ni b00000001
+    bnz .right_col                  ; if column is odd, right column
+.left_col:
+    ; bit is row number + 4
+    lris a,_ROW_SPR
+    ai 4
+    br .set_bit
+.right_col:
+    ; bit is 3 minus row number
+    lris a,_ROW_SPR
+    com
+    inc                             ; 2's complement (1's complement + 1)
+    ai 3
+.set_bit:
+    lr _FUNC_TEMP_R,a
+    ; _FUNC_TEMP_R is now the bit number
+    lis 1                           ; set A to 1
+.set_bit_loop:
+    ds _FUNC_TEMP_R                 ; decrement bit number in _FUNC_TEMP_R
+    bnc .apply_bit                  ; if no carry, that means SP2 was 0. Done
+    sl 1
+    br .set_bit_loop
+.apply_bit:
+    ; load bit value into _FUNC_TEMP_R for temp keeping
+    lr _FUNC_TEMP_R,a
     ; determine buffer A or B by inspecting bit 1 of column
-    lr a,_COL_R
+    lris a,_COL_SPR
     ni b00000010
     bnz .buffer_b                   ; columns 2 & 3 are buffer B
 .buffer_a:
@@ -109,34 +142,6 @@ set_display_led:
     li SCREEN_BUFFER_B_SPR
 .load_buffer_spr:
     lr is,a
-    ; determine buffer bit
-    ; determine if left or right column of buffer
-    lr a,_COL_R
-    ni b00000001
-    bnz .right_col                  ; if column is odd, right column
-.left_col:
-    ; bit is row number + 4
-    lis 4
-    as _ROW_R
-    br .set_bit
-.right_col:
-    ; bit is 3 minus row number
-    lr a,_ROW_R                     ; load row in A
-    com
-    inc                             ; 2's complement (1's complement + 1)
-    ai 3
-.set_bit:
-    ; register _COL_R is now the bit number
-    lr _COL_R,a
-    lis 1                           ; set A to 1
-.set_bit_loop:
-    ds _COL_R                       ; decrement SP _COL_R
-    bnc .apply_bit                  ; if no carry, that means SP2 was 0. Done
-    sl 1
-    br .set_bit_loop
-.apply_bit:
-    ; register _COL_R is now the bit value
-    lr _COL_R,a
     ; determine if we are setting or unsetting bit
     lr a,1
     ni b00010000
@@ -144,19 +149,19 @@ set_display_led:
 .set_led_on:
     lr a,[is]                       ; load buffer value from prior set IS
     ; This is all done because there is no OR from scratch pad insttruction.
-    ns _COL_R                       ; determine if bit is already set
+    ns _FUNC_TEMP_R                 ; determine if bit is already set
     bnz .finalize_led_status        ; it is set, finalize
     lr a,[is]                       ; it is not set, reload and add bit
-    as _COL_R                       ; add bit to be set.
+    as _FUNC_TEMP_R                 ; add bit to be set.
     lr [is],a                       ; update buffer value
     br .finalize_led_status
 .set_led_off:
     ; turn bit value into a AND mask
-    lr a,_COL_R
+    lr a,_FUNC_TEMP_R
     com
-    lr _COL_R,a                     ; register _COL_R is now an AND mask
+    lr _FUNC_TEMP_R,a               ; register _FUNC_TEMP_R is now an AND mask
     lr a,[is]                       ; load buffer value from prior set IS
-    ns _COL_R
+    ns _FUNC_TEMP_R
     lr [is],a                       ; update buffer value
 .finalize_led_status:
     pk                              ; done!
@@ -285,9 +290,7 @@ display_handler:
 .update_handler_state:
     lr a,TIMER_TEMP_R
     outs 0
-    li DISPLAY_SCAN_STATE_SPR
-    lr is,a
-    lr a,[is]
+    lris a,DISPLAY_SCAN_STATE_SPR
     ; get first two bits
     ni b00000011
     inc

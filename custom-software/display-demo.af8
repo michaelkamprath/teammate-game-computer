@@ -20,7 +20,7 @@ start:
     pi set_display_led
 
 idle:
-    li 127
+    li 200
     lr 1,a
 .outer_loop:
     lr a,1
