@@ -5,9 +5,6 @@
 #create_memzone external_interupt_handler $0A0 $0FF
 #create_memzone kernel_zone $500 $7FF
 
-; Include other aspects of the kernel
-#include "display.af8"
-
 ; Kernel Notes
 ;
 ;   The kernel has two main tasks: generate the display multiplexing
@@ -43,6 +40,7 @@ _TIMER_COUNTER_VALUE = 10
 ;       bit 7 - /20 prescale
 _INTERUPT_CONFIG_BITS = b10101010
 
+KERNEL_TEMP_R = 5       ; temp register for non-interupt subroutines. Not persistent.
 TIMER_TEMP_R = 6
 _AREG_SAVE_R = 7
 _ISAR_SAVE_R = 8
@@ -50,6 +48,10 @@ _ISAR_SAVE_R = 8
 ; H is registers 10 & 11 - used to save data counter
 _KU_SAVE_SPR = $3E
 _KL_SAVE_SPR = $3F
+
+; Include other aspects of the kernel
+#include "display.af8"
+#include "keyboard.af8"
 
 ;
 ; bootstrap code

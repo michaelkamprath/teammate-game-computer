@@ -1,0 +1,210 @@
+#require "mostek-3870-asm >= 0.0.1"
+
+.memzone kernel_zone
+
+_KEYS_OFFSET_COUNTER_R = 3
+_KEYS_COL_BIT_R = 4
+
+KEYSCAN_CALLBACK_HI_SPR = $38
+KEYSCAN_CALLBACK_LOW_SPR = $39
+_DEBOUNCE_KEY_SPR = $3A
+_DEBOUNCE_COUNTER_SPR = $3B
+_KEYSCAN_ROW_SPR = $3C
+_KEYS_PRESSED_SPR = $3D
+
+_ROW_PINS_P0_MASK = b00101100
+_OTHER_PINS_P0_MASK = b11010011
+
+_LOOP_DELAY = 64
+_DEBOUNCE_COUNT = 4
+
+; Key Code
+;                 Row    Col
+;   Key | Code  | Pin  | Pin
+;  ===========================
+;    0  |  $00  | P0-2 | P4-7
+;    1  |  $01  | P0-2 | P4-4
+;    2  |  $02  | P0-2 | P4-3
+;    3  |  $03  | P0-3 | P4-4
+;    4  |  $04  | P0-2 | P4-5
+;    5  |  $05  | P0-2 | P4-2
+;    6  |  $06  | P0-3 | P4-5
+;    7  |  $07  | P0-2 | P4-6
+;    8  |  $08  | P0-2 | P4-1
+;    9  |  $09  | P0-3 | P4-6
+;    A  |  $0A  | P0-3 | P4-3
+;    B  |  $0B  | P0-3 | P4-2
+;    C  |  $0C  | P0-3 | P4-1
+;    D  |  $0D  | P0-2 | P4-0
+;    E  |  $0E  | P0-3 | P4-7
+;    F  |  $0F  | P0-3 | P4-0
+;    P1 |  $10  | P0-5 | P4-4
+;    P2 |  $11  | P0-5 | P4-6
+;    P4 |  $12  | P0-5 | P4-5
+;
+; The key P3 is never detected as it resets the MK3870.
+;
+;
+
+; get_next_keypress
+;   Returns the next key pressed. Handles debouncing.
+;
+;   Argument:
+;       SPR $38 and $39 : address for callback. $0000 means no callback
+;
+;   Return value:
+;       R 1 : The key pressed. Does not return until a key is pressed.
+
+get_next_keypress:
+    lr k,p                          ; save return address to K
+    ; init debounce variables
+    liis _DEBOUNCE_COUNTER_SPR,0
+    liis _DEBOUNCE_KEY_SPR,$FF
+
+_keyscan:
+    ; start at row 0
+    li _KEYSCAN_ROW_SPR
+    lr is,a
+    lis 2
+    lr [is],a
+.row_loop:
+    ; set the row pin to the current row
+    dci _keyscan_row_pin_table
+    lris a,_KEYSCAN_ROW_SPR
+    adc
+    di                              ; DI because port 0 could be modified in timer
+    ins 0                           ; read port 0 state
+    ni _OTHER_PINS_P0_MASK          ; mask out current row pins
+    om                              ; OR in current row pin
+    outs 0                          ; update port 0 state
+    ei
+.read_keys_for_row:
+    ins 4                           ; read port 4 state
+    lr KERNEL_TEMP_R,a              ; save state to _KEYS_PRESSED_SPR
+    li _KEYS_PRESSED_SPR
+    lr is,a
+    lr a,KERNEL_TEMP_R
+    lr [is],a
+    ; scan through bits
+    lis 7
+    lr _KEYS_OFFSET_COUNTER_R,a
+    li b10000000
+    lr _KEYS_COL_BIT_R,a
+.col_loop:
+    lris a,_KEYS_PRESSED_SPR
+    ns _KEYS_COL_BIT_R
+    bnz .key_pressed
+.col_next_bit:
+    ; next bit
+    ds _KEYS_OFFSET_COUNTER_R
+    bnc .next_row                   ; no carry means we decremented from bit 0
+    lr a,_KEYS_COL_BIT_R
+    sr 1
+    lr _KEYS_COL_BIT_R,a
+    br .col_loop
+.next_row:
+    lris a,_KEYSCAN_ROW_SPR
+    ai $FF                          ; subtract 1
+    bnc .end_row_loop               ; no carry means we decremented from row 0
+    lr [is],a
+    br .row_loop
+.end_row_loop:
+    ; we are here if no key was pressed. Clear debouncing variables.
+    liis _DEBOUNCE_COUNTER_SPR,0
+    liis _DEBOUNCE_KEY_SPR,$FF
+.restart_keyscan:
+    ; restart row loop after brief delay
+    li _LOOP_DELAY
+    lr KERNEL_TEMP_R,a
+.delay_loop:
+    ds KERNEL_TEMP_R
+    bnz .delay_loop
+    ; now restart scanning
+    br _keyscan
+
+.key_pressed:
+    ; key is pressed, let's debounce it
+    ; get key value offset.
+    dci _keyscan_col_pin_lut
+    ; first, nultiply row by 8
+    lris a,_KEYSCAN_ROW_SPR
+    lr KERNEL_TEMP_R,a
+    lis 8
+.offset_loop:
+    ds KERNEL_TEMP_R
+    bnc .offset_loop_end
+    adc
+    br .offset_loop
+.offset_loop_end:
+    ; now, add column
+    lr a,_KEYS_OFFSET_COUNTER_R
+    adc
+    ; and load key vlue
+    lm
+    lr KERNEL_TEMP_R,a
+    ; compare to current
+    lris a,_DEBOUNCE_KEY_SPR
+    ci $FF
+    bz .new_key_press           ; if bebounce key was $FF, then this is a new key
+    ; take 2's complement
+    com
+    ai 1
+    ; add to key value
+    as KERNEL_TEMP_R
+    ; if zero, then same key
+    bnz .new_key_press
+.same_key_press:
+    ; increment debounch counter
+    lris a,_DEBOUNCE_COUNTER_SPR
+    inc
+    ci _DEBOUNCE_COUNT
+    bz .successful_keypress
+    lr [is],a
+    br .restart_keyscan
+
+.new_key_press:
+    ; set up debounce values, and rescan
+    li _DEBOUNCE_KEY_SPR
+    lr is,a
+    lr a,KERNEL_TEMP_R
+    lr [is],a
+    liis _DEBOUNCE_COUNTER_SPR,0
+    br .restart_keyscan
+
+.successful_keypress:
+    ; key pressed, place it in r 4, and return
+    lris a,_DEBOUNCE_KEY_SPR
+    lr 1,a
+    pk
+
+
+_keyscan_row_pin_table:
+    .byte b00000100         ; row 0
+    .byte b00001000         ; row 1
+    .byte b00100000         ; row 2
+
+_keyscan_col_pin_lut:
+    .byte $0D               ; row 0, pin 0 -> Key D
+    .byte $08               ; row 0, pin 1 -> Key 8
+    .byte $05               ; row 0, pin 2 -> Key 5
+    .byte $02               ; row 0, pin 3 -> Key 2
+    .byte $01               ; row 0, pin 4 -> Key 1
+    .byte $04               ; row 0, pin 5 -> Key 4
+    .byte $07               ; row 0, pin 6 -> Key 7
+    .byte $00               ; row 0, pin 7 -> Key 0
+    .byte $0F               ; row 1, pin 0 -> Key F
+    .byte $0C               ; row 1, pin 1 -> Key C
+    .byte $0B               ; row 1, pin 2 -> Key B
+    .byte $0A               ; row 1, pin 3 -> Key A
+    .byte $03               ; row 1, pin 4 -> Key 3
+    .byte $06               ; row 1, pin 5 -> Key 6
+    .byte $09               ; row 1, pin 6 -> Key 9
+    .byte $0E               ; row 1, pin 7 -> Key E
+    .byte $FF               ; row 2, pin 0 -> No Key
+    .byte $FF               ; row 2, pin 1 -> No Key
+    .byte $FF               ; row 2, pin 2 -> No Key
+    .byte $FF               ; row 2, pin 3 -> No Key
+    .byte $10               ; row 2, pin 4 -> P1
+    .byte $12               ; row 2, pin 5 -> P4
+    .byte $11               ; row 2, pin 6 -> P2
+    .byte $FF               ; row 2, pin 7 -> No Key

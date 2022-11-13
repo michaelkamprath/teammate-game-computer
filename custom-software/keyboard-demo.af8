@@ -1,0 +1,28 @@
+; Keyboard Demo
+;
+;   A simple demo program to demonstrate the usage of the keyboard
+;   functionality in the T.E.A.M.M.A.T.E. kernel code.
+;
+
+#require "mostek-3870-asm >= 0.0.1"
+#include "kernel.af8"
+
+.memzone program_zone
+start:
+    pi clear_display_leds
+    clr
+    lr 1,a
+    pi set_hex_value
+
+key_loop:
+    pi get_next_keypress
+    pi clear_display_leds
+    lis $F
+    ns 1
+    lr 1,a
+    pi set_hex_value
+    lr a,1
+    ai $10
+    lr 1,a
+    pi set_display_led
+    br key_loop

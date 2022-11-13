@@ -2,7 +2,7 @@
 
 .memzone kernel_zone
 
-_FUNC_TEMP_R = 4
+_LEDS_TEMP_R = KERNEL_TEMP_R
 
 DISPLAY_SCAN_STATE_SPR = $32
 HEX_DISPLAY_VALUE_SPR = $33
@@ -120,17 +120,17 @@ set_display_led:
     inc                             ; 2's complement (1's complement + 1)
     ai 3
 .set_bit:
-    lr _FUNC_TEMP_R,a
-    ; _FUNC_TEMP_R is now the bit number
+    lr _LEDS_TEMP_R,a
+    ; _LEDS_TEMP_R is now the bit number
     lis 1                           ; set A to 1
 .set_bit_loop:
-    ds _FUNC_TEMP_R                 ; decrement bit number in _FUNC_TEMP_R
+    ds _LEDS_TEMP_R                 ; decrement bit number in _LEDS_TEMP_R
     bnc .apply_bit                  ; if no carry, that means SP2 was 0. Done
     sl 1
     br .set_bit_loop
 .apply_bit:
-    ; load bit value into _FUNC_TEMP_R for temp keeping
-    lr _FUNC_TEMP_R,a
+    ; load bit value into _LEDS_TEMP_R for temp keeping
+    lr _LEDS_TEMP_R,a
     ; determine buffer A or B by inspecting bit 1 of column
     lris a,_COL_SPR
     ni b00000010
@@ -149,19 +149,19 @@ set_display_led:
 .set_led_on:
     lr a,[is]                       ; load buffer value from prior set IS
     ; This is all done because there is no OR from scratch pad insttruction.
-    ns _FUNC_TEMP_R                 ; determine if bit is already set
+    ns _LEDS_TEMP_R                 ; determine if bit is already set
     bnz .finalize_led_status        ; it is set, finalize
     lr a,[is]                       ; it is not set, reload and add bit
-    as _FUNC_TEMP_R                 ; add bit to be set.
+    as _LEDS_TEMP_R                 ; add bit to be set.
     lr [is],a                       ; update buffer value
     br .finalize_led_status
 .set_led_off:
     ; turn bit value into a AND mask
-    lr a,_FUNC_TEMP_R
+    lr a,_LEDS_TEMP_R
     com
-    lr _FUNC_TEMP_R,a               ; register _FUNC_TEMP_R is now an AND mask
+    lr _LEDS_TEMP_R,a               ; register _LEDS_TEMP_R is now an AND mask
     lr a,[is]                       ; load buffer value from prior set IS
-    ns _FUNC_TEMP_R
+    ns _LEDS_TEMP_R
     lr [is],a                       ; update buffer value
 .finalize_led_status:
     pk                              ; done!
