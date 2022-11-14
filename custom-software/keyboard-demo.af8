@@ -9,20 +9,67 @@
 
 .memzone program_zone
 start:
+    ; set up initial LED display
     pi clear_display_leds
+    dci starting_pattern_buf
+    li SCREEN_BUFFER_A_SPR
+    lr is,a
+    lm                          ; this also increments DC
+    lr [is],a
+    li SCREEN_BUFFER_B_SPR
+    lr is,a
+    lm
+    lr [is],a
+    ; set up initial hex display
     clr
     lr 1,a
     pi set_hex_value
+    pi set_hex_off
 
 key_loop:
     pi get_next_keypress
     pi clear_display_leds
-    lis $F
-    ns 1
-    lr 1,a
-    pi set_hex_value
     lr a,1
+    ni $10
+    bz .show_hex_value
+    ; it's a P-key. map value
+    lr a,1
+    inc
+    ci $13                      ; account for key P4 has value $12
+    bnz .finalize_p_key_value
+    inc
+.finalize_p_key_value:
+    lr 1,a
+.show_hex_value:
+    pi set_hex_value
+    pi set_hex_leading_special_char
+    ; create LED pattern
+    lr a,1
+    ni $10
+    bz .show_value_position
+.show_p_key_pattern:
+    dci p_key_pattern_buf
+    li SCREEN_BUFFER_A_SPR
+    lr is,a
+    lm                          ; this also increments DC
+    lr [is],a
+    li SCREEN_BUFFER_B_SPR
+    lr is,a
+    lm
+    lr [is],a
+    br key_loop
+.show_value_position:
+    lr a,1
+    ni $0F
     ai $10
     lr 1,a
     pi set_display_led
     br key_loop
+
+starting_pattern_buf:
+    .byte b11111001
+    .byte b10011111
+
+p_key_pattern_buf:
+    .byte b00000110
+    .byte b01100000

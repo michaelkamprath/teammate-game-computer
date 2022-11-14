@@ -29,6 +29,93 @@ _COL_SPR = $37
 ;           :                          :
 ;           +--------------------------+
 ;
+; DISPLAY_SCAN_STATE_SPR bit map
+;
+;       bits 7 6 5 4 3 2 1 0
+;            xxxxxxx|---|---|
+;                     |   +---> Scan pass counter
+;                     +-------> Hex display config
+;
+;   Details:
+;       * Scan Pass Counter: indicates which element of the display hardware
+;           should be multiplexed next. Values are:
+;               0 - left LED bank
+;               1 - right LED bank
+;               2 - left hex value
+;               3 - right hex value
+;       * Hex Display Config - indicates how the hex value should be displayed
+;               0 - Hex value should be diplsay as a 2-digit hex number with
+;                   leading 0
+;               1 - Hex value should be displayed as a 2-digit number without
+;                   a leading 0, but right 0 value still shown
+;               2 - Upper nibble of hex value indicates a special charater, and
+;                   lower nibble value should be displayed as a hext value. The
+;                   special chracter values supported for upper nibble value:
+;                        0 - Empty value
+;                        1 - letter "P" (to display P-keys)
+;                        2 - underscore _
+;                        3 - dash -
+;               3 - hex display is off
+
+; initialize_display
+;
+;   Initializes the displays
+;
+;   Arguments
+;       None
+initialize_display:
+    lr k,p                          ; save return address to K
+    ; initialize scan state.
+    ; this sets hex display to have a leading zero
+    li DISPLAY_SCAN_STATE_SPR
+    lr is,a
+    clr
+    lr [is],a
+    ; clear screen
+    li SCREEN_BUFFER_A_SPR
+    lr is,a
+    clr
+    lr [is],a
+    li SCREEN_BUFFER_B_SPR
+    lr is,a
+    clr
+    lr [is],a
+    li HEX_DISPLAY_VALUE_SPR
+    lr is,a
+    clr
+    lr [is],a
+    pk                             ; return to address K
+
+set_hex_no_leading_zeros:
+    lr k,p                          ; save return address to K
+    lris a,DISPLAY_SCAN_STATE_SPR
+    ni b11110011
+    ai b00000100
+    lr [is],a
+    pk
+
+set_hex_leading_zeros:
+    lr k,p                          ; save return address to K
+    lris a,DISPLAY_SCAN_STATE_SPR
+    ni b11110011
+    lr [is],a
+    pk
+
+set_hex_leading_special_char:
+    lr k,p                          ; save return address to K
+    lris a,DISPLAY_SCAN_STATE_SPR
+    ni b11110011
+    ai b00001000
+    lr [is],a
+    pk
+
+set_hex_off:
+    lr k,p                          ; save return address to K
+    lris a,DISPLAY_SCAN_STATE_SPR
+    ni b11110011
+    ai b00001100
+    lr [is],a
+    pk
 
 ; clear_display_leds - subroutine
 ;
@@ -38,6 +125,7 @@ _COL_SPR = $37
 ;       None
 clear_display_leds:
     lr k,p                          ; save return address to K
+_internal_clear_leds:
     li SCREEN_BUFFER_A_SPR
     lr is,a
     clr
@@ -47,6 +135,7 @@ clear_display_leds:
     clr
     lr [is],a
     pk                              ; return to address K
+
 
 ; set_hex_value
 ;
@@ -166,34 +255,6 @@ set_display_led:
 .finalize_led_status:
     pk                              ; done!
 
-; initialize_display
-;
-;   Initializes the displays
-;
-;   Arguments
-;       None
-initialize_display:
-    lr k,p                          ; save return address to K
-    ; initialize scan state
-    li DISPLAY_SCAN_STATE_SPR
-    lr is,a
-    clr
-    lr [is],a
-    ; clear screen
-    li SCREEN_BUFFER_A_SPR
-    lr is,a
-    clr
-    lr [is],a
-    li SCREEN_BUFFER_B_SPR
-    lr is,a
-    clr
-    lr [is],a
-    li HEX_DISPLAY_VALUE_SPR
-    lr is,a
-    clr
-    lr [is],a
-    pk                             ; return to address K
-
 ; HEX Character Table
 ;   bit 0 - segment X
 ;   bit 1 - segment G
@@ -221,6 +282,30 @@ _hex_char_table:
     .byte b10011110   ; value E
     .byte b10001110   ; value F
 
+_hex_special_char_table:
+    .byte 0           ; empty
+    .byte b11001110   ; P character
+    .byte b00010000   ; under score
+    .byte b00000010   ; dash
+    .byte 0           ; undefined
+    .byte 0           ; undefined
+    .byte 0           ; undefined
+    .byte 0           ; undefined
+    .byte 0           ; undefined
+    .byte 0           ; undefined
+    .byte 0           ; undefined
+    .byte 0           ; undefined
+    .byte 0           ; undefined
+    .byte 0           ; undefined
+    .byte 0           ; undefined
+    .byte 0           ; undefined
+
+_multiplex_pin_table:
+    .byte 1
+    .byte 2
+    .byte $80
+    .byte $40
+
 ; display_scan
 ;
 ;   should only be called from timer_handler
@@ -229,6 +314,8 @@ display_handler:
     ; turn off multiplexer
     clr
     outs 0
+    com
+    outs 1
     ; prepare jump table
     dci .scan_state_jump_table
     ; get scan state
@@ -248,14 +335,10 @@ display_handler:
     br .right_hex
 
 .leds_buffer_a:
-    lis 1
-    lr TIMER_TEMP_R,a
     li SCREEN_BUFFER_A_SPR
     lr is,a
     br .write_display_buffer
 .leds_buffer_b:
-    lis 2
-    lr TIMER_TEMP_R,a
     li SCREEN_BUFFER_B_SPR
     lr is,a
 .write_display_buffer:
@@ -265,31 +348,75 @@ display_handler:
     br .update_handler_state
 
 .right_hex:
-    li $40
-    lr TIMER_TEMP_R,a
+    ; first check to see if hex display is off
+    lris a,DISPLAY_SCAN_STATE_SPR
+    ni b00001100
+    ci b00001100
+    bz .update_handler_state
+    ; now update hex value
     li HEX_DISPLAY_VALUE_SPR
     lr is,a
     lr a,[is]
     ni $0F
-    br .show_hex_value
+    br .load_norml_hex_value_lut
 .left_hex:
-    li $80
-    lr TIMER_TEMP_R,a
     li HEX_DISPLAY_VALUE_SPR
     lr is,a
     lr a,[is]
     ni $F0
     sr 4
-.show_hex_value:
-    ; fetch hex character from LUT
+    lr TIMER_TEMP_R,a                 ; load left valeu into temp
+    ; determine how to show left display
+    dci .left_hex_display_jump_table
+    lris a,DISPLAY_SCAN_STATE_SPR
+    ni b00001100
+    sr 1
+    sr 1
+    ; add twice to jump table address for each 2-byte jump entry
+    adc
+    adc
+    ; load value to display into A
+    lr a,TIMER_TEMP_R
+    ; execute jump table
+    lr q,dc
+    lr p0,q
+.left_hex_display_jump_table:
+    br .load_norml_hex_value_lut
+    br .left_no_leading_zero
+    br .left_special_char
+    br .update_handler_state        ; actually, don't show anything
+
+.left_no_leading_zero:
+    ci 0
+    bnz .load_norml_hex_value_lut
+    li $FF
+    br .show_hex_value
+.left_special_char:
+    ; fetch hex character from special LUT
+    dci _hex_special_char_table
+    br .load_hex_pattern
+.load_norml_hex_value_lut:
+    ; fetch hex character from normal LUT
     dci _hex_char_table
+.load_hex_pattern:
     adc
     lm
-    com             ; invert the bits
+    com                             ; invert the bits
+.show_hex_value:
     outs 1
+
+
+
 .update_handler_state:
-    lr a,TIMER_TEMP_R
+    dci _multiplex_pin_table
+    ; get scan state
+    lris a,DISPLAY_SCAN_STATE_SPR
+    ; get first two bits
+    ni b00000011
+    adc
+    lm
     outs 0
+    ; increment scan counter
     lris a,DISPLAY_SCAN_STATE_SPR
     ; get first two bits
     ni b00000011
