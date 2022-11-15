@@ -1,9 +1,9 @@
 #require "mostek-3870-asm >= 0.0.1"
 
-#create_memzone program_zone $100 $4FF
+#create_memzone program_zone $100 $3FF
 #create_memzone timer_handler $020 $09F
 #create_memzone external_interupt_handler $0A0 $0FF
-#create_memzone kernel_zone $500 $7FF
+#create_memzone kernel_zone $400 $7FF
 
 ; Kernel Notes
 ;
