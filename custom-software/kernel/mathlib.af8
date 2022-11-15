@@ -1,0 +1,80 @@
+#require "mostek-3870-asm >= 0.0.2"
+
+
+_WORKING_MEM_HI = $20
+_WORKING_MEM_LO = $21
+
+.memzone kernel_zone
+; multiply8
+;   multiplies two uint8 values to produce a single uint16 result
+;
+;   Arguments
+;       sp 1 - a uint8 multiplicand X (multiplier)
+;       sp 2 - a uint8 multiplicand Y (multiplicand)
+;
+;   Returns
+;       sp 1 - high byte of uint16 result X*Y
+;       sp 2 - low byte of uint16 result X*Y
+;
+;   Scratch Pad Used
+;       sp 3 - Shift counter
+;       sp 4 - carry indicator
+;        $20 - high byte of working memory
+;        $21 - low byte of working memory
+;
+multiply8:
+    lr k,p                          ; save return address to K
+    ; init working memory
+    ; init counter to 8 bit
+    lis 8
+    lr 3,a
+    ; high byte of working memory init to 0
+    li _WORKING_MEM_HI
+    lr is,a
+    clr
+    lr [is],a
+    ; low byte of working memory is X
+    li _WORKING_MEM_LO
+    lr is,a
+    lr a,1
+    lr [is],a
+.loop:
+    ; check to see if LSb of working memory multiplier is 1
+    lris a,_WORKING_MEM_LO
+    ni b00000001
+    bz .continue
+    ; add high word of results to multiplicand
+    lris a,_WORKING_MEM_HI
+    as 2
+    lr [is],a
+.continue:
+    ; shift working memory right one
+    lris a,_WORKING_MEM_HI
+    ni $01              ; check to see if LSb will carry
+    lr 4,a              ; save carry result for MSB
+    lr a,[is]
+    sr 1
+    lr [is],a
+    lris a,_WORKING_MEM_LO
+    sr 1
+    lr [is],a
+    lr a,4
+    ci 0
+    bz .no_carry
+    lris a,_WORKING_MEM_LO
+    ai $80
+    lr [is],a
+.no_carry:
+    ; decrment counter and continue
+    ds 3
+    bnz .loop
+.done:
+    ; save results back to registers
+    lris a,_WORKING_MEM_HI
+    lr 1,a
+    lris a,_WORKING_MEM_LO
+    lr 2,a
+    ; and return
+    pk
+
+

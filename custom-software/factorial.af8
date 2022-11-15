@@ -1,0 +1,107 @@
+; Factorial Calculator
+;
+;   Will calculate the factorial of the key value pressed. Results are
+;   displayed in the hex display. Calculations are limitted to 8-bit results,
+;   so max factorial calculaatable is 5!. Input values that are too large
+;   will reset the display and calculate nothing.
+;
+#require "mostek-3870-asm >= 0.0.2"
+#include "kernel.af8"
+#include "mathlib.af8"
+
+.memzone program_zone
+start:
+    ; set up initial LED display
+    pi clear_display_leds
+
+reset_display:
+    dci starting_pattern_buf
+    li SCREEN_BUFFER_A_SPR
+    lr is,a
+    lm                          ; this also increments DC
+    lr [is],a
+    li SCREEN_BUFFER_B_SPR
+    lr is,a
+    lm
+    lr [is],a
+    ; set up initial hex display
+    clr
+    lr 1,a
+    pi set_hex_value
+    pi set_hex_off
+
+
+loop:
+    pi get_next_keypress
+    pi clear_display_leds
+    ; check to see if key press is an allowable value
+    ; for factorial (0-5)
+    lr a,1
+    lr 2,a              ; save in r 2 temporily
+    ci 5
+    bnc _unallowed_key
+    ; its a supported key, lets calculate
+    ai $10
+    lr 1,a
+    pi set_display_led
+    pi set_hex_off
+    ; reset r 1 to n value
+    lr a,2
+    lr 1,a
+
+_calc_factorial:
+    ; if value is 0 or 1, the factorial is 1
+    ci 1
+    bnc _start_factorial        ; no carry means value is > 1
+    liis $11,1
+    br _show_fctorial_results
+    ; init SPR
+    ; SPR Usage
+    ;   $10 - current N value
+    ;   $11 - running factorial product
+    ;
+_start_factorial:
+    liis $11,1
+    lr a,1
+_recurse_factorial:
+    ; Argument
+    ;   N value pass in r 1
+    ;
+    ; if N is 1, we are done
+
+    ci 1
+    bz _show_fctorial_results
+    ; n value is in r 1, save it to $10
+    li $10
+    lr is,a
+    lr a,1
+    lr [is],a
+    ; multiply N by current factorial product
+    lris a,$11
+    lr 2,a
+    pi multiply8
+    ; save low byte of results (only support 8-bit)
+    li $11
+    lr is,a
+    lr a,2
+    lr [is],a
+    ; decrement n and loop
+    lris a,$10
+    ai $FF              ; subtract 1
+    lr 1,a
+    br _recurse_factorial
+
+_show_fctorial_results:
+    ; get results
+    lris a,$11
+    lr 1,a
+    pi set_hex_value
+    pi set_hex_no_leading_zeros
+    br loop
+
+_unallowed_key:
+    br reset_display
+
+starting_pattern_buf:
+    .byte b00000110
+    .byte b01100000

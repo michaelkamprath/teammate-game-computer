@@ -4,7 +4,7 @@
 ;   functionality in the T.E.A.M.M.A.T.E. kernel code.
 ;
 
-#require "mostek-3870-asm >= 0.0.1"
+#require "mostek-3870-asm >= 0.0.2"
 #include "kernel.af8"
 
 .memzone program_zone

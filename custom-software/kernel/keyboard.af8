@@ -1,4 +1,4 @@
-#require "mostek-3870-asm >= 0.0.1"
+#require "mostek-3870-asm >= 0.0.2"
 
 .memzone kernel_zone
 
