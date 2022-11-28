@@ -9,7 +9,7 @@ fi
 rom_image=$1
 destination_dir=${2%/}
 
-cp $rom_image mk14194n
-zip teammate.zip mk14194n
-mv teammate.zip $destination_dir
+cp -v $rom_image mk14194n
+zip -v teammate.zip mk14194n
+mv -v teammate.zip $destination_dir
 rm mk14194n

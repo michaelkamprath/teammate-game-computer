@@ -12,7 +12,7 @@ Custom software and a kernel to build custom software on top of can be found in 
 ## MAME Support
 Thanks to the effort of [GitHub user **happppp**](https://github.com/happppp), [MAME](https://github.com/mamedev/mame) has been updated to support the **T.E.A.M.M.A.T.E. Game Computer**. Both the original ROM and homebrew software can be run with MAME. The shell script `make_mame_rom.sh` is included in this repository to facilitate running **T.E.A.M.M.A.T.E.** ROMs with MAME. It will package a 2K binary image as MAME expects, and then copy it to your MAME `roms` directory as indicated as a command argument.
 
-When running homebrew software, MAME must be launched from the command line with the `name teammate` command. Furthermore, MAME will complain that the homebrew software image is incorrect, but this warning will be ignored when launching from the command line.
+When running homebrew software, MAME must be launched from the command line with the `mame teammate` command. Furthermore, MAME will complain that the homebrew software image is incorrect, but this warning will be ignored when launching from the command line.
 
 ## Links
 Here are some interesting links about the **T.E.A.M.M.A.T.E. Game Computer**:
