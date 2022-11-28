@@ -75,10 +75,7 @@ initialize_display:
     li SCREEN_BUFFER_A_SPR
     lr is,a
     clr
-    lr [is],a
-    li SCREEN_BUFFER_B_SPR
-    lr is,a
-    clr
+    lr [is]+,a                      ; increment IS because next is SCREEN_BUFFER_B_SPR
     lr [is],a
     li HEX_DISPLAY_VALUE_SPR
     lr is,a
@@ -129,10 +126,7 @@ _internal_clear_leds:
     li SCREEN_BUFFER_A_SPR
     lr is,a
     clr
-    lr [is],a
-    li SCREEN_BUFFER_B_SPR
-    lr is,a
-    clr
+    lr [is]+,a                      ; increment IS because next is SCREEN_BUFFER_B_SPR
     lr [is],a
     pk                              ; return to address K
 
