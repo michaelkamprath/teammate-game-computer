@@ -54,7 +54,7 @@ _calc_factorial:
     ci 1
     bnc _start_factorial        ; no carry means value is > 1
     liis $11,1
-    br _show_fctorial_results
+    br _show_factorial_results
     ; init SPR
     ; SPR Usage
     ;   $10 - current N value
@@ -70,7 +70,7 @@ _recurse_factorial:
     ; if N is 1, we are done
 
     ci 1
-    bz _show_fctorial_results
+    bz _show_factorial_results
     ; n value is in r 1, save it to $10
     li $10
     lr is,a
@@ -91,7 +91,7 @@ _recurse_factorial:
     lr 1,a
     br _recurse_factorial
 
-_show_fctorial_results:
+_show_factorial_results:
     ; get results
     lris a,$11
     lr 1,a
