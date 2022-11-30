@@ -306,8 +306,10 @@ _multiplex_pin_table:
 
 display_handler:
     ; turn off multiplexer
+    ins 0                 ; read port 0 state
+    ni b00111100          ; mask out multiplex row pins
+    outs 0                ; reset port 0
     clr
-    outs 0
     com
     outs 1
     ; prepare jump table
@@ -408,7 +410,9 @@ display_handler:
     ; get first two bits
     ni b00000011
     adc
-    lm
+    ins 0
+    ni b00111100                    ; mask out multiplex row pins
+    om
     outs 0
     ; increment scan counter
     lris a,DISPLAY_SCAN_STATE_SPR

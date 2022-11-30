@@ -33,12 +33,15 @@ idle:
     bnz .loop
     br .outer_loop
 .next_increment:
-    pi clear_display_leds
     lris a, HEX_DISPLAY_VALUE_SPR
     inc
     lr [is],a
     ni $0F
+    lr 1,a
+    lris a, HEX_DISPLAY_VALUE_SPR
     ai $10
+    ni $10
+    as 1
     lr 1,a
     pi set_display_led
     br idle
