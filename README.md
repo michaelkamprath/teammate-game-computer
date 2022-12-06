@@ -28,3 +28,5 @@ Here are some interesting links about the **T.E.A.M.M.A.T.E. Game Computer**:
 
 [![Programming the Vintage T.E.A.M.M.A.T.E. Game Computer - ROM Dump](https://img.youtube.com/vi/QBq6Z2U4Ob8/maxresdefault.jpg)](https://youtu.be/QBq6Z2U4Ob8)
 
+
+[![Programming the Vintage T.E.A.M.M.A.T.E. Game Computer - Refurbishing and Programming](https://img.youtube.com/vi/jLeeUsYbr_k/maxresdefault.jpg)](https://youtu.be/jLeeUsYbr_k)
