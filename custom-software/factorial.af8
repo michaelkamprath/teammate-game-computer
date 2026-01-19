@@ -6,8 +6,8 @@
 ;   will reset the display and calculate nothing.
 ;
 #require "mostek-3870-asm >= 0.0.2"
-#include "kernel.af8"
-#include "mathlib.af8"
+#include "kernel/kernel.af8"
+#include "kernel/mathlib.af8"
 
 .memzone program_zone
 start:
